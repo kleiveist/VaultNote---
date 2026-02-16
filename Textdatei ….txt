@@ -1,0 +1,537 @@
+okay lass und die App selber bauern
+dazu machen wir ein beain Stomin welche anfoderungen wir haben und was wir habne wollen
+damit wir als grundgerüst schonmal ein Prejkt starten
+
+Verwendungsname im Markdown-Kontext: YAML Front Matter / Frontmatter / Metadata Block
+
+Die [[...]]-Links sind WikiLinks (typisch Obsidian). Das ist nicht YAML-spezifisch, sondern nur ein String-Inhalt im YAML.
+
+Typisch sieht es so aus (mit Trennern), wenn es wirklich „Frontmatter“ sein soll:
+
+---
+Cover: '[[IDBS01KS-01-01.png]]'
+Section: IUFS
+Rank: SE1
+Projekt: IDBS01
+Task: Exam
+Ergebnis: "0 | 🚫 Nicht begonnen"
+Prozent: "0% | ⚪ 0"
+MuiChoi: null
+TransA3: null
+tags:
+  - IDBS01KS-01
+  - IUFS
+  - SE1
+  - IDBS01
+  - Exam
+link1: '[[IDBS01KS-01]]'
+---
+
+Vorschlag fürs Grundgerüst (Vault + MD + JSON) 🧱
+
+Damit ihr direkt ein Projekt starten könnt, hier ein solides „Start-Design“ ohne Overkill:
+
+1) Core-Idee
+
+Vault = Arbeitsbereich (Scope/Filter)
+
+App lädt nur Dateien innerhalb des Vault-Pfads
+
+Markdown = Inhalte (Tasks/Notizen/Specs)
+
+JSON = Settings + Indizes + App-State (schnell, maschinenlesbar)
+
+2) Ordnerstruktur (konkret)
+/appdata
+  /vaults
+    /IDBS01
+      vault.json              <-- Vault-Definition (Name, Pfade, Regeln)
+      /md
+        IDBS01KS-01.md
+        ...
+      /json
+        settings.json         <-- Vault-spezifische Settings
+        index.json            <-- Cache/Index (optional)
+        ui.json               <-- UI-Zustände (optional)
+      /assets
+        IDBS01KS-01-01.png
+
+3) Vault-Definition (Beispiel vault.json)
+
+definiert, welche Ordner zur Vault gehören
+
+optional: Tags/Regeln/Scopes
+
+{
+  "id": "IDBS01",
+  "name": "Projekt IDBS01",
+  "paths": {
+    "md": "./md",
+    "json": "./json",
+    "assets": "./assets"
+  },
+  "rules": {
+    "loadOnlyInsideVault": true
+  }
+}
+
+4) Datenmodell für MD-Dateien
+
+Oben: YAML Frontmatter (Metadata wie bei dir)
+
+Unten: Markdown-Body (Beschreibung, Checklisten, Logs, etc.)
+
+Damit kannst du sehr gut filtern/sortieren (Tags, Rank, Ergebnis, Prozent, etc.).
+
+
+1) Gesamt-Layout (3-Bereiche + Top/Bottom Bars)
+
+Fensteraufbau (von links nach rechts):
+
+Navigation Rail (Icon-Toolbar links, vertikal)
+
+Explorer/Verzeichnisbereich (Sidebar links, breit)
+
+Editorbereich (rechts, Hauptfläche)
+
+Zusätzlich:
+
+Top Bar (oben) für globale/kontextuelle Aktionen
+
+Bottom Bar (unten) für Vault-Auswahl + Help/Settings
+
+2) Top Bar (oben)
+2.1 Linke Top-Icons (global)
+
+Oben links befindet sich eine kleine Icon-Reihe:
+
+Collapse/Expand-Icon (Sidebar ein-/ausklappen)
+
+Bereichs-/Modus-Icons (im Screenshot z.B. Ordner, Suche, Bookmark)
+
+Verhalten: Klick wechselt den Fokus/Mode (z.B. Explorer aktiv, Suche aktiv, Bookmarks aktiv)
+
+Aktiver Mode ist visuell hervorgehoben (z.B. Hintergrund/Outline)
+
+Pflichtverhalten:
+
+Sidebar-Collapse klappt den linken Bereich (Explorer) ein/aus, die Navigation Rail bleibt optional sichtbar.
+
+Tooltips bei Hover (Desktop).
+
+2.2 Explorer-Toolbar (oberhalb der Dateiliste, im Explorerbereich)
+
+Im Explorerbereich (oberhalb der Baum-/Dateiansicht) ist eine sekundäre Toolbar mit Actions, im Screenshot z.B.:
+
+Edit/Pencil (Bearbeiten/Modus/Metadaten/Umbenennen je nach Konzept)
+
+Plus (Neu: Datei/Ordner/Objekt)
+
+Sort/UpDown (Sortieren oder Move Up/Down)
+
+Layout/View (Darstellung wechseln: Liste/Kompakt)
+
+Close/X (Explorerbereich schließen oder Aktion abbrechen)
+
+3) Navigation Rail (Icon-Toolbar links, vertikal)
+
+Eine schmale, fixe Icon-Leiste am linken Rand. Enthält Hauptmodule (laut dir):
+
+Dashboard
+
+Editor
+
+Graph
+
+Zusätzlich sind im Screenshot mehrere Icons vorhanden (z.B. Dateien/Graph/Grid/Kalender etc.). Anforderungen:
+
+Verhalten
+
+Klick auf ein Modul-Icon:
+
+aktiviert Modul
+
+wechselt Hauptinhalt rechts (Explorer + Editor Verhalten abhängig vom Modul)
+
+Aktives Icon hat einen klaren Active-State (z.B. Linie/Background/Accent).
+
+Optional: Rechtsklick/Long-Press für Kontext (z.B. „in neuem Tab öffnen“).
+
+4) Explorer / Verzeichnisbereich (links, breit) 🗂️
+4.1 Darstellung
+
+Tree View mit Ordnern (chevron zum Auf/Zu-klappen) und Dateien darunter.
+
+Ordner/Dateien in einer Liste untereinander, mit Indentation nach Baumtiefe.
+
+Auswahlzustand für aktuell markiertes Element.
+
+4.2 Dateioperationen (Pflicht)
+
+Daten/Dateien lassen sich im Explorer:
+
+Öffnen (Click/Enter/Doppelklick – je nach Plattformstandard)
+
+Kopieren
+
+Verschieben (Drag&Drop + Cut/Paste)
+
+Umbenennen (F2/Context Menu)
+
+Pfad öffnen (im Dateisystem anzeigen)
+
+Mit externem Standard-/Alternativeditor öffnen
+
+Interaktionsstandard
+
+Kontextmenü pro Datei/Ordner:
+Öffnen | Öffnen mit… | Im Dateipfad öffnen | Umbenennen | Kopieren | Ausschneiden | Einfügen | Verschieben… | Löschen
+
+Drag&Drop: Datei auf Ordner => Move (mit Modifier optional Copy).
+
+5) Editorbereich (rechts) ✏️
+5.1 Tabs/„Registerkarten“ oberhalb des Editors
+
+Direkt über der Editorfläche befinden sich Tab-Leisten (Registerkarten) für offene Dateien/Ansichten.
+
+Tabs: Titel (Dateiname), Active-State, optional Close-Icon pro Tab.
+
+Verhalten
+
+Klick Tab = Datei aktiv
+
+Mittelklick / X = Tab schließen
+
+Ungespeicherte Änderungen werden markiert (z.B. Punkt).
+
+5.2 Editor-Header/Controls (direkt unter Tabs)
+
+Direkt unter den Tabs:
+
+Linksbündig: Pfeiltasten (←/→)
+Zweck: Navigation (z.B. „zurück/vor“ in Editor-History oder vorherige/nächste Datei)
+
+Rechtsbündig: Umschalter Code-Modus ↔ View/Preview-Modus
+
+Code-Modus: Rohtext (Markdown/YAML/JSON)
+
+View-Modus: gerenderte Vorschau (Markdown Preview)
+
+Optional (empfohlen)
+
+Split View: Code | Preview nebeneinander (falls später gewünscht)
+
+5.3 Tastatur: „Strg Öffnen“ erweiterbar
+
+Anforderung: Ein „Öffnen“-Mechanismus per Shortcut ist erweiterbar (Plugins/Commands).
+
+Strg+O (oder Strg+P, je nach Entscheidung) öffnet Quick Open / Command Palette
+
+Dieses System ist erweiterbar:
+
+neue Commands registrierbar
+
+Suchfeld (fuzzy search)
+
+Scope: Dateien, Commands, Vaults, ggf. Tags
+
+6) Bottom Bar (unten) 🧭
+6.1 Vault Switcher (links)
+
+Unten links: Vault-Register mit aktuellem Vault-Namen (z.B. „FMDFlashcard“)
+
+Dropdown ist nach oben aufklappbar (DropUp)
+
+Verhalten
+
+Klick öffnet Liste aller Vaults
+
+Auswahl wechselt aktiven Vault und lädt Inhalte entsprechend Vault-Regeln
+
+6.2 Help & Settings (rechts)
+
+Rechtsbündig in der Bottom Bar:
+
+Help/Icon (?)
+
+Settings/Icon (⚙️)
+
+Öffnen
+
+Beide öffnen Popup/Modal (nicht als kompletter Seitenwechsel)
+
+Popups schließen per:
+
+X
+
+Klick außerhalb
+
+ESC
+
+7) Zustände & UX-Regeln (kurz, aber verpflichtend) ✅
+
+Active States: klar erkennbar für
+
+aktives Modul (Navigation Rail)
+
+selektierte Datei (Explorer)
+
+aktiver Tab (Editor)
+
+Leere Zustände:
+
+Wenn kein Tab offen: „Datei auswählen…“
+
+Wenn Vault leer: „Keine Dateien im Vault…“
+
+Persistenz:
+
+letzter Vault + zuletzt offene Tabs werden gespeichert (JSON Settings)
+
+Markdown-Editor – Verhaltensspezifikation
+1) Editormodi
+1.1 Modi
+
+Der Editor unterstützt mindestens zwei Modi:
+
+Code-Modus (Source Mode)
+Bearbeitung von Rohtext (Markdown inkl. YAML-Frontmatter).
+
+View-Modus (Preview Mode)
+Gerenderte Vorschau (Markdown gerendert; Links klickbar; Bilder sichtbar).
+
+Optional (später):
+
+Split View: links Code, rechts Preview, synchrones Scrollen.
+
+1.2 Umschalten
+
+Umschalter rechts oben im Editorbereich (wie in deiner UI beschrieben).
+
+Umschalten darf Cursorposition und Scrollposition möglichst beibehalten.
+
+Preview ist read-only (MVP). Optional: Klick in Preview setzt Cursor im Source (später).
+
+2) Markdown-Syntax (Standard-Unterstützung)
+2.1 Grundelemente
+
+Unterstützte Syntax im Rendering (GFM-nahe Standards):
+
+Überschriften: # bis ######
+
+Absatz, Zeilenumbruch (Standard-Markdown Regeln)
+
+Listen:
+
+Ungeordnet: -, *, +
+
+Geordnet: 1.
+
+Checkboxen: - [ ] / - [x]
+
+Zitate: >
+
+Horizontale Linie (Trennlinie):
+--- oder *** oder ___ als eigene Zeile
+
+Links:
+
+Inline: [Text](url)
+
+Autolink: <https://...>
+
+Bilder:
+
+Markdown: ![alt](path)
+
+Wiki-Style (optional, da ihr Obsidian-like nutzt): [[image.png]]
+
+2.2 Textformatierungen
+
+Fett: **text** oder __text__
+
+Kursiv: *text* oder _text_
+
+Fett+Kursiv: ***text***
+
+Inline-Code: `code`
+
+Durchgestrichen (GFM): ~~text~~
+
+3) Codeblöcke & Syntax Highlighting
+3.1 Inline & Block
+
+Inline: `print("x")`
+
+Block: Triple-Backticks:
+
+```py
+print("hello")
+```
+
+3.2 Verhalten
+
+Im Codeblock werden Markdown-Regeln nicht angewendet.
+
+Sprache nach ``` wird als Language Identifier behandelt (z.B. py, js, json, bash).
+
+Editor zeigt Syntaxhighlighting im Code-Modus (wenn verfügbar).
+
+Copy-Button im Preview optional (später).
+
+4) Mathe (LaTeX)
+4.1 Inline-Mathe
+
+Inline-Mathe: $ ... $
+Beispiel: Die Formel ist $E=mc^2$.
+
+4.2 Block-Mathe
+
+Block: $$ ... $$ als eigener Block
+Beispiel:
+
+$$
+\int_0^1 x^2 dx
+$$
+
+4.3 Regeln
+
+Mathe wird nur gerendert im Preview.
+
+Im Code-Modus bleibt es Text.
+
+Fehlersituationen (z.B. unclosed $) sollen nicht crashen → stattdessen als Text behandeln oder Hinweis markieren.
+
+5) YAML Frontmatter (Metadata)
+5.1 Erkennung
+
+Wenn eine Datei mit folgendem Block startet:
+
+---
+key: value
+tags:
+  - A
+  - B
+---
+
+
+… dann wird das als Frontmatter erkannt.
+
+5.2 Verhalten
+
+Frontmatter gehört logisch zu den Metadaten der Datei.
+
+Im Code-Modus editierbar wie normaler Text.
+
+Im Preview standardmäßig nicht anzeigen (Default), optional über Toggle „Metadaten anzeigen“.
+
+Validierung (leicht):
+
+Ungültiges YAML wird markiert (z.B. Warnsymbol), Datei bleibt trotzdem speicherbar.
+
+6) Editor-Interaktionen (Standardkomfort)
+6.1 Auto-Pairs
+
+Beim Tippen werden Paare automatisch ergänzt:
+
+( → ()
+
+[ → []
+
+{ → {}
+
+" → ""
+
+' → ''
+
+` → `` (bei Inline-Code optional nur bei Auswahl)
+
+** / * (Wrap bei Auswahl, siehe unten)
+
+6.2 Auswahl „wrap“ (Formatieren auf Selection)
+
+Wenn Text markiert ist:
+
+Ctrl+B → umschließen mit **...**
+
+Ctrl+I → umschließen mit *...*
+
+**Ctrl+** → umschließen mit `` ...` `` (Inline)
+
+Ctrl+Shift+C (optional) → Codeblock darum herum
+
+6.3 Listen-Enter Verhalten
+
+In Listen:
+
+Enter am Ende einer Listenzeile → neue Listenzeile mit gleichem Prefix.
+
+Enter auf leerer Listenzeile → Liste wird beendet (Prefix entfernen).
+
+Checkboxen behalten Struktur: - [ ] wird fortgesetzt.
+
+6.4 Tab/Indent
+
+Tab innerhalb von Listen/Codeblöcken indentiert.
+
+Shift+Tab outdent.
+
+In normalen Absätzen: Tab kann entweder indentieren oder Fokus wechseln (Konfig; Standard: indentieren im Editor).
+
+7) Links & Navigation
+7.1 In Preview
+
+Klick auf Link öffnet Ziel:
+
+Web-URL: extern oder eingebetteter Browser (je nach App-Policy)
+
+Interne Links (z.B. [[Note]]): öffnet Datei in neuem Tab oder ersetzt Tab (Konfig)
+
+7.2 In Code-Modus
+
+Ctrl+Click auf Link/Wikilink öffnet Ziel (Standard IDE-Verhalten).
+
+8) Dateien, Speichern, History
+8.1 Speichern
+
+Ctrl+S speichert aktuelle Datei.
+
+Auto-Save optional (Konfig: off/on).
+
+Dirty-State: Tab zeigt ungespeichert Markierung.
+
+8.2 Undo/Redo
+
+Undo: Ctrl+Z
+
+Redo: Ctrl+Y oder Ctrl+Shift+Z
+
+8.3 Back/Forward Navigation
+
+Die Pfeile (←/→) oben im Editor navigieren:
+
+durch Editor-History (zuletzt besuchte Dateien/Positionen).
+
+9) Rendering-Regeln (Preview)
+
+Trennlinien --- werden als <hr> gerendert.
+
+Codeblöcke werden gerendert + Highlighting.
+
+Mathe wird gerendert (Inline/Block).
+
+Frontmatter standardmäßig verborgen.
+
+Unbekannte/kaputte Syntax wird robust als Text gerendert.
+
+10) Erweiterbarkeit (Commands)
+
+Der Editor stellt eine Command-API bereit:
+
+togglePreview, toggleSplitView, formatBold, formatItalic, insertCodeBlock(lang), insertMathInline, insertMathBlock, openCommandPalette, etc.
+
+Diese Commands sind über Shortcut-System bindbar (dein „Strg öffnen erweiterbar“ passt hier sauber rein).
+
+
+
+
