@@ -38,6 +38,7 @@ from console import (
     ok,
     cmd as console_cmd,
 )
+from project_paths import app_dir_hint, resolve_app_dir
 
 
 def _repo_root_from_tools_inst_build() -> Path:
@@ -125,12 +126,9 @@ def _find_portable_exe(release_dir: Path) -> Path | None:
 
 def run_install(dry_run: bool = False) -> int:
     repo_root = _repo_root_from_tools_inst_build()
-    app_dir = (repo_root / "apps" / "fmd-desktop").resolve()
-    legacy_dir = (repo_root / "tools" / "apps" / "fmd-desktop").resolve()
-    if not app_dir.exists() and legacy_dir.exists():
-        app_dir = legacy_dir
+    app_dir, _source = resolve_app_dir(repo_root)
     if not app_dir.exists():
-        raise SystemExit(f"Desktop app dir not found: {app_dir}")
+        raise SystemExit(f"Desktop app dir not found: {app_dir}. {app_dir_hint()}")
 
     allow_cross_env = os.environ.get("ALLOW_CROSS", "0")
     allow_cross_enabled = allow_cross_env.lower() in ("1", "true", "yes")

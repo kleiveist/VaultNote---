@@ -39,6 +39,7 @@ from console import (
     warn,
     cmd as console_cmd,
 )
+from project_paths import app_dir_hint, resolve_app_dir
 
 
 def _repo_root_from_tools_inst_build() -> Path:
@@ -296,14 +297,10 @@ def run_install(dry_run: bool = False) -> int:
         return 2
 
     repo_root = _repo_root_from_tools_inst_build()
-    app_dir = (repo_root / "apps" / "fmd-desktop").resolve()
-    legacy_dir = (repo_root / "tools" / "apps" / "fmd-desktop").resolve()
-    using_legacy = False
-    if not app_dir.exists() and legacy_dir.exists():
-        app_dir = legacy_dir
-        using_legacy = True
+    app_dir, source = resolve_app_dir(repo_root)
+    using_legacy = source.startswith("legacy:")
     if not app_dir.exists():
-        raise SystemExit(f"Desktop app dir not found: {app_dir}")
+        raise SystemExit(f"Desktop app dir not found: {app_dir}. {app_dir_hint()}")
 
     runner = os.environ.get("WIN_LINUX_RUNNER", "cargo-xwin")
     target = os.environ.get("WIN_LINUX_TARGET", "x86_64-pc-windows-msvc")
@@ -328,7 +325,7 @@ def run_install(dry_run: bool = False) -> int:
     info(f"Repo root: {repo_root}")
     info(f"App dir:   {app_dir}")
     if using_legacy:
-        warn("Using legacy path: consider migrating to /apps/fmd-desktop")
+        warn("Using legacy path: consider migrating to /apps/vaultnote-desktop")
 
     section("Settings")
     kv("WIN_LINUX_TARGET", target)

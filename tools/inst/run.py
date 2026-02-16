@@ -6,7 +6,7 @@ control.py entry:
   python3 tools/control.py --start (alias: --run)
 
 What it does (default):
-  cd <repo>/apps/fmd-desktop
+  cd <repo>/apps/vaultnote-desktop
   (optional) pnpm install (if node_modules missing)
   pnpm tauri dev
 """
@@ -21,6 +21,8 @@ import sys
 import signal
 from pathlib import Path
 from typing import List, Optional
+
+from project_paths import app_dir_hint, resolve_app_dir
 
 ICONS = {
     "ok": "✅",
@@ -179,14 +181,12 @@ def run_install(dry_run: bool = False) -> int:
         # Still attempt to run in case pnpm/tauri is usable.
     try:
         repo_root = repo_root_from_here()
-        target_dir = (repo_root / "apps" / "fmd-desktop").resolve()
-        legacy_dir = (repo_root / "tools" / "apps" / "fmd-desktop").resolve()
-        if not target_dir.exists() and legacy_dir.exists():
+        target_dir, source = resolve_app_dir(repo_root)
+        if source.startswith("legacy:"):
             print(
-                f"{ICONS['warn']} Found legacy path (tools/apps). "
-                "Consider re-running --tauri to scaffold into /apps."
+                f"{ICONS['warn']} Found legacy app path ({target_dir}). "
+                "Consider migrating to apps/vaultnote-desktop."
             )
-            target_dir = legacy_dir
 
         section("Run Context")
         print(f"{ICONS['info']} Repo root:  {repo_root}")
@@ -195,6 +195,7 @@ def run_install(dry_run: bool = False) -> int:
         if not target_dir.exists():
             print(f"{ICONS['err']} Target directory not found.")
             print(f"{ICONS['info']} Create it first with: python3 tools/control.py --tauri")
+            print(f"{ICONS['info']} {app_dir_hint()}")
             return 1
 
         if which("pnpm") is None:

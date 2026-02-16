@@ -5,3 +5,8 @@ __pycache__/
 # OS/editor noise
 .DS_Store
 Thumbs.db
+
+# JavaScript / Tauri artifacts
+node_modules/
+dist/
+src-tauri/target/

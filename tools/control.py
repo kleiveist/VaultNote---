@@ -53,6 +53,7 @@ for extra_dir in extra_dirs:
 
 from doctor import run as run_doctor  # type: ignore
 from console import info, section as console_section
+from project_paths import app_dir_hint, resolve_app_dir
 
 RunInstall = Callable[[bool], int]
 RunVsCodeInstall = Callable[[], int]
@@ -93,15 +94,14 @@ def _repo_root_from_tools_control() -> Path:
 def cmd_build_desktop() -> int:
     """
     Build Tauri desktop app (release bundles).
-    Equivalent to: cd apps/fmd-desktop && pnpm tauri build
+    Equivalent to: cd apps/vaultnote-desktop && pnpm tauri build
     """
     repo_root = _repo_root_from_tools_control()
-    app_dir = (repo_root / "apps" / "fmd-desktop").resolve()
-    legacy_dir = (repo_root / "tools" / "apps" / "fmd-desktop").resolve()
-    if not app_dir.exists() and legacy_dir.exists():
-        app_dir = legacy_dir
+    app_dir, source = resolve_app_dir(repo_root)
     if not app_dir.exists():
-        raise SystemExit(f"Desktop app dir not found: {app_dir}")
+        raise SystemExit(f"Desktop app dir not found: {app_dir}. {app_dir_hint()}")
+    if source.startswith("legacy:"):
+        info(f"Using legacy app path: {app_dir}")
 
     pnpm = _which_pnpm()
 
@@ -232,7 +232,8 @@ def _print_build_helper() -> None:
     info("  --build-win  Windows build (default bundles via WIN_BUNDLES). Use -p for portable.")
     info("  --build-mac  macOS bundles (MAC_BUNDLES=app,dmg, ALLOW_CROSS).")
     info("  --build --winlinux  Windows cross-compile on Linux (cargo-xwin, portable exe).")
-    info("  --build --copy  Copy produced bundles to AppInsall target folders.")
+    info("  --build --copy  Copy produced bundles to configured output target folders.")
+    info(f"  App directory override: {app_dir_hint()}")
 
 
 def _load_build_win_runner() -> Callable[..., int] | None:
@@ -322,6 +323,11 @@ def _load_build_copy_runner() -> Callable[..., int] | None:
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Project toolbox launcher.")
     parser.add_argument(
+        "--app-dir",
+        default=None,
+        help="Desktop app directory relative to repo root (or absolute path).",
+    )
+    parser.add_argument(
         "--doctor",
         action="store_true",
         help="Runs the system/tooling check.",
@@ -354,6 +360,51 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Installs Tauri prerequisites (Linux).",
     )
     parser.add_argument(
+        "--tauri-target",
+        default=None,
+        help="Scaffold target directory for --tauri (relative to repo root by default).",
+    )
+    parser.add_argument(
+        "--tauri-template",
+        default=None,
+        help="Template for create-tauri-app (example: react-ts).",
+    )
+    parser.add_argument(
+        "--tauri-identifier",
+        default=None,
+        help="Bundle identifier for scaffolded Tauri app (example: com.vaultnote.desktop).",
+    )
+    parser.add_argument(
+        "--tauri-repo-root",
+        default=None,
+        help="Override repository root for --tauri setup.",
+    )
+    parser.add_argument(
+        "--tauri-skip-system-deps",
+        action="store_true",
+        help="Skip Linux package installation stage in --tauri.",
+    )
+    parser.add_argument(
+        "--tauri-skip-install",
+        action="store_true",
+        help="Skip pnpm install after scaffold in --tauri.",
+    )
+    parser.add_argument(
+        "--tauri-dev",
+        action="store_true",
+        help="Run pnpm tauri dev after --tauri setup.",
+    )
+    parser.add_argument(
+        "--tauri-force",
+        action="store_true",
+        help="Force scaffold into an existing non-empty target during --tauri.",
+    )
+    parser.add_argument(
+        "--tauri-full-upgrade-arch",
+        action="store_true",
+        help="On Arch Linux: run full upgrade before dependency install in --tauri.",
+    )
+    parser.add_argument(
         "--run",
         "--start",
         dest="run",
@@ -373,7 +424,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--copy",
         action="store_true",
-        help="Copy produced bundles into the AppInsall destination folders (use with --build).",
+        help="Copy produced bundles into configured destination folders (use with --build).",
     )
     parser.add_argument(
         "--build-lin",
@@ -414,6 +465,9 @@ def main(argv: list[str] | None = None) -> int:
     exit_code = 0
     handled = False
 
+    if args.app_dir:
+        os.environ["VAULTNOTE_APP_DIR"] = args.app_dir
+
     if args.install:
         handled = True
         run_install = _load_installer_run_install()
@@ -443,15 +497,32 @@ def main(argv: list[str] | None = None) -> int:
             print("No Tauri install routine found. Expected: tools/inst/linux/installuixtauri.py")
             exit_code = max(exit_code, 1)
         else:
-            # Accept run_install() or run_install(dry_run)
             try:
-                sig = inspect.signature(run_tauri)
-                if len(sig.parameters) == 0:
-                    exit_code = max(exit_code, run_tauri())
-                else:
+                exit_code = max(
+                    exit_code,
+                    run_tauri(
+                        dry_run=args.dry_run,
+                        target=args.tauri_target,
+                        template=args.tauri_template,
+                        identifier=args.tauri_identifier,
+                        repo_root=args.tauri_repo_root,
+                        skip_system_deps=args.tauri_skip_system_deps,
+                        full_upgrade_arch=args.tauri_full_upgrade_arch,
+                        skip_install=args.tauri_skip_install,
+                        dev=args.tauri_dev,
+                        force=args.tauri_force,
+                    ),
+                )
+            except TypeError:
+                # Backward compatible call style.
+                try:
+                    sig = inspect.signature(run_tauri)
+                    if len(sig.parameters) == 0:
+                        exit_code = max(exit_code, run_tauri())
+                    else:
+                        exit_code = max(exit_code, run_tauri(args.dry_run))
+                except Exception:
                     exit_code = max(exit_code, run_tauri(args.dry_run))
-            except Exception:
-                exit_code = max(exit_code, run_tauri(args.dry_run))
 
     if args.run:
         handled = True

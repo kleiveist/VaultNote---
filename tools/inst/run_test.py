@@ -6,7 +6,7 @@ control.py entry:
   python3 tools/control.py --test
 
 Default behavior:
-  - pnpm -C apps/fmd-desktop test
+  - pnpm -C apps/vaultnote-desktop test
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from console import (
     section,
     warn,
 )
+from project_paths import app_dir_hint, resolve_app_dir
 
 
 def _repo_root_from_here() -> Path:
@@ -61,9 +62,9 @@ def _format_duration(seconds: float) -> str:
 
 def run_install(dry_run: bool = False) -> int:
     repo_root = _repo_root_from_here()
-    app_dir = (repo_root / "apps" / "fmd-desktop").resolve()
+    app_dir, _source = resolve_app_dir(repo_root)
     if not app_dir.exists():
-        raise SystemExit(f"Desktop app dir not found: {app_dir}")
+        raise SystemExit(f"Desktop app dir not found: {app_dir}. {app_dir_hint()}")
 
     pnpm = _which_pnpm()
     env = os.environ.copy()
@@ -74,8 +75,8 @@ def run_install(dry_run: bool = False) -> int:
     if dry_run:
         warn("Dry run mode enabled: commands will not run.")
 
-    cmd = [pnpm, "-C", str(app_dir), "test"]
-    rc, duration = _run(cmd, cwd=repo_root, env=env, dry_run=dry_run)
+    cmd = [pnpm, "test"]
+    rc, duration = _run(cmd, cwd=app_dir, env=env, dry_run=dry_run)
     if rc == 0:
         ok("pnpm test succeeded.")
     else:
@@ -87,4 +88,3 @@ def run_install(dry_run: bool = False) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(run_install(False))
-

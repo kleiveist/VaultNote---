@@ -214,9 +214,14 @@ def scaffold_project(target_dir: Path, template: str, identifier: str) -> None:
 
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description="Prepare Linux for Tauri (WASD libs, pnpm, rustup, scaffold).")
-    ap.add_argument("--target", default="apps/fmd-desktop")
+    default_target = (
+        os.environ.get("VAULTNOTE_APP_DIR")
+        or os.environ.get("APP_DIR")
+        or "apps/vaultnote-desktop"
+    )
+    ap.add_argument("--target", default=default_target)
     ap.add_argument("--template", default="react-ts")
-    ap.add_argument("--identifier", default="com.fmd.flashcard")
+    ap.add_argument("--identifier", default="com.vaultnote.desktop")
     ap.add_argument("--repo-root", default=None)
     ap.add_argument("--skip-system-deps", action="store_true")
     ap.add_argument("--full-upgrade-arch", action="store_true")
@@ -296,10 +301,43 @@ def main(argv: Optional[List[str]] = None) -> int:
     except Exception as ex:
         eprint(f"{ICONS['err']} {ex}"); return 1
 
-def run_install(dry_run: bool = False) -> int:
+def run_install(
+    dry_run: bool = False,
+    *,
+    target: Optional[str] = None,
+    template: Optional[str] = None,
+    identifier: Optional[str] = None,
+    repo_root: Optional[str] = None,
+    skip_system_deps: bool = False,
+    full_upgrade_arch: bool = False,
+    skip_install: bool = False,
+    dev: bool = False,
+    force: bool = False,
+) -> int:
     global _DRY_RUN
     _DRY_RUN = dry_run
-    return main([])
+
+    argv: List[str] = []
+    if target:
+        argv.extend(["--target", target])
+    if template:
+        argv.extend(["--template", template])
+    if identifier:
+        argv.extend(["--identifier", identifier])
+    if repo_root:
+        argv.extend(["--repo-root", repo_root])
+    if skip_system_deps:
+        argv.append("--skip-system-deps")
+    if full_upgrade_arch:
+        argv.append("--full-upgrade-arch")
+    if skip_install:
+        argv.append("--skip-install")
+    if dev:
+        argv.append("--dev")
+    if force:
+        argv.append("--force")
+
+    return main(argv)
 
 if __name__ == "__main__":
     raise SystemExit(main())

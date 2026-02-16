@@ -31,6 +31,7 @@ from console import (
     ok,
     cmd as console_cmd,
 )
+from project_paths import app_dir_hint, resolve_app_dir
 
 
 def _repo_root_from_tools_inst() -> Path:
@@ -94,14 +95,10 @@ def run_install(dry_run: bool = False) -> int:
     """
     original_env = os.environ
     repo_root = _repo_root_from_tools_inst()
-    app_dir = (repo_root / "apps" / "fmd-desktop").resolve()
-    legacy_dir = (repo_root / "tools" / "apps" / "fmd-desktop").resolve()
-    using_legacy = False
-    if not app_dir.exists() and legacy_dir.exists():
-        app_dir = legacy_dir
-        using_legacy = True
+    app_dir, source = resolve_app_dir(repo_root)
+    using_legacy = source.startswith("legacy:")
     if not app_dir.exists():
-        raise SystemExit(f"Desktop app dir not found: {app_dir}")
+        raise SystemExit(f"Desktop app dir not found: {app_dir}. {app_dir_hint()}")
 
     pnpm = _which_pnpm()
 
@@ -124,7 +121,7 @@ def run_install(dry_run: bool = False) -> int:
     info(f"Repo root:  {repo_root}")
     info(f"App dir:   {app_dir}")
     if using_legacy:
-        warn("Using legacy path: consider migrating to /apps/fmd-desktop")
+        warn("Using legacy path: consider migrating to /apps/vaultnote-desktop")
 
     section("Settings")
     kv("NO_STRIP", f"{no_strip_value} ({'default' if no_strip_defaulted else 'override'})")

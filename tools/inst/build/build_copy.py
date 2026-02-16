@@ -1,29 +1,33 @@
 #!/usr/bin/env python3
 """
-Copy generated build artifacts into external AppInsall directories.
+Copy generated build artifacts into configured destination directories.
 
 control.py entry:
   python3 tools/control.py --build --copy
 
-Sources:
-  - apps/fmd-desktop/src-tauri/target/release/bundle/appimage
-  - apps/fmd-desktop/src-tauri/target/release/bundle/deb
-  - apps/fmd-desktop/src-tauri/target/release/bundle/rpm
-  - apps/fmd-desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/portable
+Sources (resolved under the desktop app directory):
+  - src-tauri/target/release/bundle/appimage
+  - src-tauri/target/release/bundle/deb
+  - src-tauri/target/release/bundle/rpm
+  - src-tauri/target/<WIN_COPY_TARGET>/release/bundle/portable
 
-Destinations:
-  - /mnt/T7-1TB/workspace/Blobbite/Develop/PythonLinux/AppInsall
-  - /mnt/T7-2TB/workspace/Blobbite/Develop/PythonLinux/AppInsall
-  - /mnt/daten/workspace/Blobbite/Develop/PythonLinux/AppInsall
+Configuration:
+  - BUNDLE_COPY_DESTS      Path-separated list of destination roots.
+                           If unset, defaults to: <repo>/dist/bundles
+  - WIN_COPY_TARGET        Windows target triple used for portable zip source.
+                           Defaults to WIN_LINUX_TARGET or x86_64-pc-windows-msvc.
+  - APPIMAGE_OUTPUT_NAME   Optional output filename override for AppImage files.
 """
 
 from __future__ import annotations
 
+import os
 import shutil
 import time
 from pathlib import Path
 
 from console import action, bundle, err, info, kv, ok, section, warn
+from project_paths import app_dir_hint, resolve_app_dir
 
 
 def _repo_root_from_tools_inst_build() -> Path:
@@ -76,51 +80,53 @@ def _format_duration(seconds: float) -> str:
     return f"{seconds:.2f}s"
 
 
-def _mount_root_for_path(path: Path) -> Path:
-    parts = path.parts
-    if len(parts) >= 3 and parts[0] == "/" and parts[1] == "mnt":
-        return Path("/") / "mnt" / parts[2]
-    return Path(path.anchor) if path.anchor else path
-
-
-def _destination_available(destination_root: Path) -> bool:
-    mount_root = _mount_root_for_path(destination_root)
-    if not mount_root.exists():
-        warn(f"Target skipped (storage not found): {destination_root} (missing: {mount_root})")
-        return False
-    if mount_root.parts[:2] == ("/", "mnt") and not mount_root.is_mount():
-        warn(f"Target skipped (storage not mounted): {destination_root} (mount: {mount_root})")
-        return False
-    return True
-
-
 def _destination_file_path(kind: str, source_dir: Path, src: Path, destination_dir: Path) -> Path:
     if kind == "appimage":
-        return destination_dir / "FMDFlashcard.AppImage"
+        output_name = os.environ.get("APPIMAGE_OUTPUT_NAME", "").strip()
+        if output_name:
+            if "." not in output_name:
+                output_name = f"{output_name}.AppImage"
+            return destination_dir / output_name
     rel = src.relative_to(source_dir)
     return destination_dir / rel
+
+
+def _resolve_destination_roots(repo_root: Path) -> tuple[Path, ...]:
+    raw = os.environ.get("BUNDLE_COPY_DESTS", "").strip()
+    if not raw:
+        return ((repo_root / "dist" / "bundles").resolve(),)
+
+    roots: list[Path] = []
+    for item in raw.split(os.pathsep):
+        candidate = item.strip()
+        if not candidate:
+            continue
+        path = Path(candidate).expanduser()
+        if not path.is_absolute():
+            path = (repo_root / path).resolve()
+        else:
+            path = path.resolve()
+        if path not in roots:
+            roots.append(path)
+    return tuple(roots)
 
 
 def run_install(dry_run: bool = False) -> int:
     overall_start = time.perf_counter()
 
     repo_root = _repo_root_from_tools_inst_build()
-    app_dir = (repo_root / "apps" / "fmd-desktop").resolve()
-    legacy_dir = (repo_root / "tools" / "apps" / "fmd-desktop").resolve()
-    if not app_dir.exists() and legacy_dir.exists():
-        app_dir = legacy_dir
+    app_dir, source = resolve_app_dir(repo_root)
+    using_legacy = source.startswith("legacy:")
     if not app_dir.exists():
-        raise SystemExit(f"Desktop app dir not found: {app_dir}")
+        raise SystemExit(f"Desktop app dir not found: {app_dir}. {app_dir_hint()}")
+
+    win_target = os.environ.get("WIN_COPY_TARGET") or os.environ.get(
+        "WIN_LINUX_TARGET", "x86_64-pc-windows-msvc"
+    )
 
     linux_bundle_dir = app_dir / "src-tauri" / "target" / "release" / "bundle"
     win_portable_dir = (
-        app_dir
-        / "src-tauri"
-        / "target"
-        / "x86_64-pc-windows-msvc"
-        / "release"
-        / "bundle"
-        / "portable"
+        app_dir / "src-tauri" / "target" / win_target / "release" / "bundle" / "portable"
     )
 
     source_specs: dict[str, tuple[Path, tuple[str, ...]]] = {
@@ -129,15 +135,15 @@ def run_install(dry_run: bool = False) -> int:
         "rpm": (linux_bundle_dir / "rpm", ("*.rpm",)),
         "portable": (win_portable_dir, ("*.zip",)),
     }
-    destination_roots = (
-        Path("/mnt/T7-1TB/workspace/Blobbite/Develop/PythonLinux/AppInsall"),
-        Path("/mnt/T7-2TB/workspace/Blobbite/Develop/PythonLinux/AppInsall"),
-        Path("/mnt/daten/workspace/Blobbite/Develop/PythonLinux/AppInsall"),
-    )
+    destination_roots = _resolve_destination_roots(repo_root)
 
     section("Run Context")
     info(f"Repo root: {repo_root}")
     info(f"App dir:   {app_dir}")
+    if using_legacy:
+        warn("Using legacy path: consider migrating to /apps/vaultnote-desktop")
+    kv("WIN_COPY_TARGET", win_target)
+    kv("BUNDLE_COPY_DESTS", os.environ.get("BUNDLE_COPY_DESTS", "<repo>/dist/bundles"))
     if dry_run:
         warn("Dry run mode enabled: no files or directories will be written.")
 
@@ -165,12 +171,8 @@ def run_install(dry_run: bool = False) -> int:
 
     copied_files = 0
     failed_steps = 0
-    skipped_targets = 0
 
     for destination_root in destination_roots:
-        if not _destination_available(destination_root):
-            skipped_targets += 1
-            continue
         section(f"Copy -> {destination_root}")
         for kind, (source_dir, _) in source_specs.items():
             destination_dir = destination_root / kind
@@ -196,7 +198,6 @@ def run_install(dry_run: bool = False) -> int:
     section("Result")
     kv("Source files", str(source_file_count))
     kv("Copy operations", str(copied_files))
-    kv("Skipped targets", str(skipped_targets))
     if failed_steps:
         kv("Failed steps", str(failed_steps))
     kv("Total time", _format_duration(total_time))
